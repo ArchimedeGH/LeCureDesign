@@ -5,7 +5,6 @@ import getPort from 'get-port'
 import waitOn from 'wait-on'
 
 let serverProc = null
-let win = null
 
 async function startNextServer() {
   const port = await getPort({ port: getPort.makeRange(3001, 3999) })
@@ -35,11 +34,13 @@ async function startNextServer() {
 
 async function createWindow() {
   const port = await startNextServer()
-  win = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1280,
     height: 900,
     title: 'Scandinavian Kitchen Planner',
-    webPreferences: { preload: path.join(path.dirname(new URL(import.meta.url).pathname), 'preload.js') }
+    webPreferences: {
+      preload: path.join(path.dirname(new URL(import.meta.url).pathname), 'preload.js')
+    }
   })
   win.removeMenu()
   win.loadURL(`http://127.0.0.1:${port}`)
@@ -49,4 +50,3 @@ async function createWindow() {
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 app.on('before-quit', () => { if (serverProc) serverProc.kill('SIGINT') })
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
