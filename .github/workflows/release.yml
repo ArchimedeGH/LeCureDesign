@@ -1,28 +1,192 @@
-name: Release macOS DMG
+name: Release macOS DMG (Self-Bootstrapping)
+
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    tags: ['v*']   # e.g. v0.1.0
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # If your repo is empty (no package.json), create a minimal app on the fly
+      - name: Bootstrap minimal app if empty
+        run: |
+          if [ ! -f package.json ]; then
+            echo "Repo missing app files. Bootstrapping minimal Electron+Next app..."
+            mkdir -p app electron public
+            cat > package.json << 'JSON'
+            {
+              "name": "scandi-kitchen-desktop",
+              "version": "0.1.0",
+              "private": true,
+              "main": "electron/main.js",
+              "type": "module",
+              "scripts": {
+                "dev": "concurrently \"next dev -p 3000\" \"wait-on tcp:3000 && electron .\"",
+                "build:web": "next build",
+                "build:app": "electron-builder --mac dmg --universal",
+                "build": "npm run build:web && npm run build:app"
+              },
+              "dependencies": {
+                "next": "15.0.0",
+                "react": "18.3.1",
+                "react-dom": "18.3.1"
+              },
+              "devDependencies": {
+                "concurrently": "8.2.2",
+                "electron": "31.2.0",
+                "electron-builder": "24.13.3",
+                "get-port": "7.1.0",
+                "wait-on": "7.2.0",
+                "typescript": "5.6.2"
+              },
+              "build": {
+                "appId": "com.archimedekh.lecuredesign",
+                "files": [
+                  "electron/**/*",
+                  "app/**/*",
+                  "public/**/*",
+                  "package.json",
+                  "next.config.mjs",
+                  "tsconfig.json",
+                  "!.next/cache/**"
+                ],
+                "extraResources": [
+                  { "from": ".next/standalone", "to": "next-standalone" },
+                  { "from": ".next/static", "to": "next-static" },
+                  { "from": "public", "to": "public" }
+                ],
+                "mac": {
+                  "target": ["dmg"],
+                  "category": "public.app-category.graphics-design",
+                  "hardenedRuntime": false,
+                  "gatekeeperAssess": false,
+                  "identity": null
+                },
+                "dmg": {
+                  "artifactName": "ScandiKitchenPlanner-${version}-mac-${arch}.${ext}"
+                }
+              }
+            }
+            JSON
+
+            cat > next.config.mjs << 'JS'
+            /** @type {import('next').NextConfig} */
+            const nextConfig = { output: 'standalone', reactStrictMode: true }
+            export default nextConfig
+            JS
+
+            cat > tsconfig.json << 'JSON'
+            {
+              "compilerOptions": {
+                "target": "ES2022",
+                "lib": ["dom", "dom.iterable", "es2022"],
+                "allowJs": true,
+                "skipLibCheck": true,
+                "strict": true,
+                "forceConsistentCasingInFileNames": true,
+                "noEmit": true,
+                "module": "esnext",
+                "moduleResolution": "bundler",
+                "resolveJsonModule": true,
+                "isolatedModules": true,
+                "jsx": "preserve"
+              },
+              "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+              "exclude": ["node_modules"]
+            }
+            JSON
+
+            cat > app/page.tsx << 'TSX'
+            export default function Home() {
+              return (
+                <main style={{ padding: 24, fontFamily: 'ui-sans-serif, system-ui' }}>
+                  <h1 style={{ fontSize: 28, marginBottom: 8 }}>Scandinavian Kitchen Planner</h1>
+                  <p>Minimal starter build for DMG packaging.</p>
+                </main>
+              )
+            }
+            TSX
+
+            cat > electron/main.js << 'JS'
+            import { app, BrowserWindow, shell } from 'electron'
+            import path from 'node:path'
+            import { spawn } from 'node:child_process'
+            import getPort from 'get-port'
+            import waitOn from 'wait-on'
+            let serverProc = null
+            async function startNextServer() {
+              const port = await getPort({ port: getPort.makeRange(3001, 3999) })
+              const resources = process.resourcesPath || path.join(process.cwd())
+              const standaloneDir = path.join(resources, 'next-standalone')
+              const publicDir = path.join(resources, 'public')
+              const staticDir = path.join(resources, 'next-static')
+              const serverJs = path.join(standaloneDir, 'server.js')
+              serverProc = spawn(process.execPath, [serverJs], {
+                env: { ...process.env, NODE_ENV: 'production', PORT: String(port), HOSTNAME: '127.0.0.1',
+                  NEXT_PUBLIC_REGION: 'EU-IT', NEXT_PUBLIC_CURRENCY: 'EUR',
+                  NEXT_STATIC_DIR: staticDir, NEXT_PUBLIC_DIR: publicDir },
+                cwd: standaloneDir, stdio: 'inherit'
+              })
+              await waitOn({ resources: [`http://127.0.0.1:${port}`], timeout: 300000 })
+              return port
+            }
+            async function createWindow() {
+              const port = await startNextServer()
+              const win = new BrowserWindow({
+                width: 1280, height: 900, title: 'Scandinavian Kitchen Planner',
+                webPreferences: { preload: path.join(path.dirname(new URL(import.meta.url).pathname), 'preload.js') }
+              })
+              win.removeMenu()
+              win.loadURL(`http://127.0.0.1:${port}`)
+              win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' } })
+            }
+            app.whenReady().then(createWindow)
+            app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+            app.on('before-quit', () => { if (serverProc) serverProc.kill('SIGINT') })
+            app.on('activate', () => {})
+            JS
+
+            cat > electron/preload.js << 'JS'
+            import { contextBridge } from 'electron'
+            contextBridge.exposeInMainWorld('desktop', { version: '0.1.0' })
+            JS
+          else
+            echo "Found package.json — using your repo files."
+          fi
+
       - name: Install deps
-        run: npm install
-      - name: Build Next.js
+        run: npm install --no-audit --no-fund
+
+      - name: Build Next.js (standalone)
         run: npm run build:web
-      - name: Build DMG
+
+      - name: Build Electron DMG (universal)
         run: npm run build:app
         env:
           NEXT_PUBLIC_REGION: EU-IT
           NEXT_PUBLIC_CURRENCY: EUR
-      - uses: actions/upload-artifact@v4
-        with: { name: dmg, path: dist/*.dmg }
-      - if: startsWith(github.ref, 'refs/tags/')
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: dist/*.dmg
+
+      - name: Create GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
-        with: { files: dist/*.dmg }
+        with:
+          files: dist/*.dmg
