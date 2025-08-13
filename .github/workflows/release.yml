@@ -1,4 +1,4 @@
-name: Release macOS DMG (Self-Bootstrapping)
+name: Release macOS DMG (arm64)
 
 on:
   workflow_dispatch:
@@ -20,11 +20,11 @@ jobs:
         with:
           node-version: 20
 
-      # If your repo is empty (no package.json), create a minimal app on the fly
+      # Bootstrap minimal app if repo is empty (keeps things simple)
       - name: Bootstrap minimal app if empty
         run: |
           if [ ! -f package.json ]; then
-            echo "Repo missing app files. Bootstrapping minimal Electron+Next app..."
+            echo "Bootstrapping minimal Electron + Next app..."
             mkdir -p app electron public
             cat > package.json << 'JSON'
             {
@@ -34,10 +34,7 @@ jobs:
               "main": "electron/main.js",
               "type": "module",
               "scripts": {
-                "dev": "concurrently \"next dev -p 3000\" \"wait-on tcp:3000 && electron .\"",
-                "build:web": "next build",
-                "build:app": "electron-builder --mac dmg --universal",
-                "build": "npm run build:web && npm run build:app"
+                "build:web": "next build"
               },
               "dependencies": {
                 "next": "15.0.0",
@@ -45,7 +42,6 @@ jobs:
                 "react-dom": "18.3.1"
               },
               "devDependencies": {
-                "concurrently": "8.2.2",
                 "electron": "31.2.0",
                 "electron-builder": "24.13.3",
                 "get-port": "7.1.0",
@@ -76,7 +72,7 @@ jobs:
                   "identity": null
                 },
                 "dmg": {
-                  "artifactName": "ScandiKitchenPlanner-${version}-mac-${arch}.${ext}"
+                  "artifactName": "ScandiKitchenPlanner-${version}-mac-arm64.${ext}"
                 }
               }
             }
@@ -163,9 +159,13 @@ jobs:
             import { contextBridge } from 'electron'
             contextBridge.exposeInMainWorld('desktop', { version: '0.1.0' })
             JS
-          else
-            echo "Found package.json — using your repo files."
           fi
+
+      - name: Print versions
+        run: |
+          node -v
+          npm -v
+          npx electron-builder --version
 
       - name: Install deps
         run: npm install --no-audit --no-fund
@@ -173,11 +173,12 @@ jobs:
       - name: Build Next.js (standalone)
         run: npm run build:web
 
-      - name: Build Electron DMG (universal)
-        run: npm run build:app
-        env:
-          NEXT_PUBLIC_REGION: EU-IT
-          NEXT_PUBLIC_CURRENCY: EUR
+      # Build arm64-only DMG (more reliable on GitHub macOS runners)
+      - name: Build Electron DMG (arm64)
+        run: npx electron-builder --mac dmg --arm64
+
+      - name: List dist
+        run: ls -la dist || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
