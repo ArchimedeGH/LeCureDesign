@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Rewrite package.json (known-good)
+                 - name: Rewrite package.json (known-good)
         run: |
           cat > package.json << 'JSON'
           {
@@ -40,12 +40,12 @@ jobs:
               "next": "15.0.0",
               "react": "18.3.1",
               "react-dom": "18.3.1",
-              "@react-three/fiber": "8.15.20",
-              "@react-three/drei": "9.105.0",
-              "konva": "9.3.11",
-              "pdf-lib": "1.17.1",
-              "react-konva": "18.2.9",
-              "three": "0.160.0"
+              "@react-three/fiber": "^8.15.0",
+              "@react-three/drei": "^9.105.0",
+              "konva": "^9.3.11",
+              "pdf-lib": "^1.17.1",
+              "react-konva": "^18.2.9",
+              "three": "^0.160.0"
             },
             "devDependencies": {
               "concurrently": "8.2.2",
@@ -92,7 +92,7 @@ jobs:
           npx electron-builder --version
 
       - name: Install deps
-        run: npm install --no-audit --no-fund --legacy-peer-deps
+  run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Build Next (standalone)
         run: npm run build:web
