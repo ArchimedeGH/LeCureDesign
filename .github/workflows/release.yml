@@ -1,7 +1,7 @@
-name: Release macOS DMG (Electron Hello)
+name: Build macOS DMG (Hello App, safe)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # you run it manually
 
 permissions:
   contents: write
@@ -15,9 +15,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
 
-      - name: Bootstrap minimal Electron app
+      # Build in a separate folder so your repo contents can't break the build
+      - name: Bootstrap hello app
         run: |
-          mkdir -p electron public
+          mkdir -p hello/electron hello/public
+          cd hello
           cat > package.json << 'JSON'
           {
             "name": "lecuredesign-electron",
@@ -25,19 +27,8 @@ jobs:
             "private": true,
             "main": "electron/main.js",
             "type": "module",
-            "scripts": {
-              "build:app": "electron-builder --mac dmg --arm64"
-            },
-            "devDependencies": {
-              "electron": "31.2.0",
-              "electron-builder": "24.13.3"
-            },
-            "build": {
-              "appId": "com.archimedekh.lecuredesign",
-              "files": [ "electron/**/*", "public/**/*", "package.json" ],
-              "mac": { "target": ["dmg"], "identity": null, "hardenedRuntime": false, "gatekeeperAssess": false },
-              "dmg": { "artifactName": "LeCureDesign-${version}-mac-arm64.${ext}" }
-            }
+            "scripts": { "build:app": "electron-builder --mac dmg --arm64 -c.mac.identity=null -c.dmg.artifactName='LeCureDesign-${version}-mac-arm64.${ext}'" },
+            "devDependencies": { "electron": "31.2.0", "electron-builder": "24.13.3" }
           }
           JSON
 
@@ -55,30 +46,28 @@ jobs:
             <style>body{font:16px system-ui;margin:24px}h1{margin:0 0 8px}</style>
           </head><body>
             <h1>LeCureDesign Installer</h1>
-            <p>✅ This verifies your macOS DMG build pipeline works.</p>
-            <p>When ready, we’ll swap this “hello” app with the full kitchen planner.</p>
+            <p>✅ This verifies your DMG pipeline works. You can install this on your Mac.</p>
           </body></html>
           HTML
 
-      - name: Print versions
-        run: |
-          node -v
-          npm -v
-          npx electron-builder --version
-
       - name: Install deps
-        run: npm install --no-audit --no-fund
+        run: cd hello && npm install --no-audit --no-fund
 
       - name: Build DMG (arm64)
-        run: npm run build:app
+        run: cd hello && npm run build:app
 
-      - name: Upload artifact
+      - name: List dist
+        run: ls -la hello/dist || true
+
+      - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dmg
-          path: dist/*.dmg
+          name: LeCureDesign-DMG
+          path: hello/dist/*.dmg
 
-      - name: Create GitHub Release
+      # Only create a Release if the DMG file actually exists
+      - name: Create GitHub Release (if DMG exists)
+        if: hashFiles('hello/dist/*.dmg') != ''
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          files: hello/dist/*.dmg
