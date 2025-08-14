@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Stage, Layer, Line, Rect, Circle, Text as KText } from 'react-konva'
 import { Room, Utility } from '../lib/types'
+import type { ReactElement } from 'react'
 
 function uid() { return Math.random().toString(36).slice(2, 9) }
 
