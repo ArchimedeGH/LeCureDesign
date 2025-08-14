@@ -5,23 +5,20 @@
   "main": "electron/main.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"next dev -p 3000\" \"wait-on tcp:3000 && electron .\"",
     "build:web": "next build",
-    "build:app": "electron-builder --mac dmg --universal",
+    "build:app": "electron-builder --mac dmg --arm64",
     "build": "npm run build:web && npm run build:app"
   },
   "dependencies": {
     "next": "15.0.0",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
     "@react-three/drei": "^9.105.0",
     "@react-three/fiber": "^9.0.0",
     "konva": "^9.3.11",
     "pdf-lib": "^1.17.1",
     "react-konva": "^18.2.9",
     "three": "^0.160.0"
-    "@react-three/drei", "@react-three/fiber", "konva",
-    "pdf-lib", "react-konva", "three"
   },
   "devDependencies": {
     "concurrently": "8.2.2",
@@ -55,7 +52,7 @@
       "identity": null
     },
     "dmg": {
-      "artifactName": "ScandiKitchenPlanner-${version}-mac-${arch}.${ext}"
+      "artifactName": "LeCureDesign-${version}-mac-arm64.${ext}"
     }
   }
 }
