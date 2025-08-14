@@ -1,10 +1,129 @@
-name: Test Runner (Full Planner visibility)
+name: Build macOS DMG (Full Planner, auto-release)
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+env:
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+  ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: "true"
+
 jobs:
-  ping:
+  build:
     runs-on: macos-14
     steps:
-      - run: echo "Workflow visibile e funzionante"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rewrite package.json (known-good)
+        run: |
+          cat > package.json << 'JSON'
+          {
+            "name": "scandi-kitchen-desktop",
+            "version": "0.1.0",
+            "private": true,
+            "main": "electron/main.js",
+            "type": "module",
+            "scripts": {
+              "build:web": "next build",
+              "build:app": "electron-builder --mac dmg --arm64",
+              "build": "npm run build:web && npm run build:app"
+            },
+            "dependencies": {
+              "next": "15.0.0",
+              "react": "18.3.1",
+              "react-dom": "18.3.1",
+              "@react-three/fiber": "8.15.20",
+              "@react-three/drei": "9.105.0",
+              "konva": "9.3.11",
+              "pdf-lib": "1.17.1",
+              "react-konva": "18.2.9",
+              "three": "0.160.0"
+            },
+            "devDependencies": {
+              "concurrently": "8.2.2",
+              "electron": "31.2.0",
+              "electron-builder": "24.13.3",
+              "get-port": "7.1.0",
+              "wait-on": "7.2.0",
+              "typescript": "5.6.2"
+            },
+            "build": {
+              "appId": "com.archimedekh.lecuredesign",
+              "files": [
+                "electron/**/*",
+                "app/**/*",
+                "public/**/*",
+                "package.json",
+                "next.config.mjs",
+                "tsconfig.json",
+                "!.next/cache/**"
+              ],
+              "extraResources": [
+                { "from": ".next/standalone", "to": "next-standalone" },
+                { "from": ".next/static", "to": "next-static" },
+                { "from": "public", "to": "public" }
+              ],
+              "mac": {
+                "target": ["dmg"],
+                "category": "public.app-category.graphics-design",
+                "hardenedRuntime": false,
+                "gatekeeperAssess": false,
+                "identity": null
+              },
+              "dmg": {
+                "artifactName": "LeCureDesign-${version}-mac-arm64.${ext}"
+              }
+            }
+          }
+          JSON
+
+      - name: Print versions
+        run: |
+          node -v
+          npm -v
+          npx electron-builder --version
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Build Next (standalone)
+        run: npm run build:web
+
+      - name: Build Electron DMG (arm64)
+        run: npx electron-builder --mac dmg --arm64
+        env:
+          DEBUG: electron-builder
+
+      - name: List dist
+        run: ls -la dist || true
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeCureDesign-Full
+          path: dist/*.dmg
+
+      - name: Create & push tag
+        run: |
+          TAG="v${GITHUB_RUN_NUMBER}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Auto tag $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "LeCureDesign ${{ env.TAG }}"
+          files: dist/*.dmg
+          generate_release_notes: true
