@@ -1,7 +1,7 @@
-name: Build macOS DMG (Hello App, safe)
+name: Build macOS DMG (Hello App, auto-release)
 
 on:
-  workflow_dispatch:  # you run it manually
+  workflow_dispatch:  # run manually
 
 permissions:
   contents: write
@@ -11,11 +11,13 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # necessario per creare/pushare il tag
 
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
 
-      # Build in a separate folder so your repo contents can't break the build
+      # Build in cartella isolata "hello"
       - name: Bootstrap hello app
         run: |
           mkdir -p hello/electron hello/public
@@ -27,8 +29,13 @@ jobs:
             "private": true,
             "main": "electron/main.js",
             "type": "module",
-            "scripts": { "build:app": "electron-builder --mac dmg --arm64 -c.mac.identity=null -c.dmg.artifactName='LeCureDesign-${version}-mac-arm64.${ext}'" },
-            "devDependencies": { "electron": "31.2.0", "electron-builder": "24.13.3" }
+            "scripts": {
+              "build:app": "electron-builder --mac dmg --arm64 -c.mac.identity=null -c.dmg.artifactName='LeCureDesign-${version}-mac-arm64.${ext}'"
+            },
+            "devDependencies": {
+              "electron": "31.2.0",
+              "electron-builder": "24.13.3"
+            }
           }
           JSON
 
@@ -46,7 +53,7 @@ jobs:
             <style>body{font:16px system-ui;margin:24px}h1{margin:0 0 8px}</style>
           </head><body>
             <h1>LeCureDesign Installer</h1>
-            <p>✅ This verifies your DMG pipeline works. You can install this on your Mac.</p>
+            <p>✅ Pipeline DMG ok. Puoi installare questa app sul Mac.</p>
           </body></html>
           HTML
 
@@ -65,11 +72,21 @@ jobs:
           name: LeCureDesign-DMG
           path: hello/dist/*.dmg
 
-      - name: Create GitHub Release (auto-tag)
-        if: hashFiles('hello/dist/*.dmg') != ''
+      # === NEW: crea e pusha un tag (v<run_number>) ===
+      - name: Create & push tag
+        run: |
+          TAG="v${GITHUB_RUN_NUMBER}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Auto tag $TAG"
+          git push origin "$TAG"
+
+      # Usa il tag creato per pubblicare il Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
+          name: "LeCureDesign ${{ env.TAG }}"
           files: hello/dist/*.dmg
-          tag_name: v${{ github.run_number }}
-          name: "LeCureDesign v${{ github.run_number }}"
           generate_release_notes: true
