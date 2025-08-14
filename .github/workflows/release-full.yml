@@ -1,0 +1,67 @@
+name: Build macOS DMG (Full Planner, auto-release)
+
+on:
+  workflow_dispatch:  # avvio manuale
+
+permissions:
+  contents: write
+
+env:
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+  ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: "true"
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }  # serve per creare/pushare un tag
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Stampa versioni
+        run: |
+          node -v
+          npm -v
+          npx electron-builder --version
+
+      - name: Installa dipendenze
+        run: npm install --no-audit --no-fund
+
+      - name: Build Next (standalone)
+        run: npm run build:web
+
+      # build DMG solo arm64 (Mac Apple Silicon)
+      - name: Build Electron DMG (arm64)
+        run: npx electron-builder --mac dmg --arm64
+        env:
+          DEBUG: electron-builder
+
+      - name: Lista dist
+        run: ls -la dist || true
+
+      - name: Carica DMG come artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeCureDesign-Full
+          path: dist/*.dmg
+
+      # Crea e pusha un tag automatico (v<run_number>)
+      - name: Create & push tag
+        run: |
+          TAG="v${GITHUB_RUN_NUMBER}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Auto tag $TAG"
+          git push origin "$TAG"
+
+      # Crea il Release pubblico con il DMG
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "LeCureDesign ${{ env.TAG }}"
+          files: dist/*.dmg
+          generate_release_notes: true
