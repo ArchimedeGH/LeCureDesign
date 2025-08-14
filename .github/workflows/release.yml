@@ -1,28 +1,84 @@
-name: Release macOS DMG
+name: Release macOS DMG (Electron Hello)
+
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+
+      - name: Bootstrap minimal Electron app
+        run: |
+          mkdir -p electron public
+          cat > package.json << 'JSON'
+          {
+            "name": "lecuredesign-electron",
+            "version": "0.0.1",
+            "private": true,
+            "main": "electron/main.js",
+            "type": "module",
+            "scripts": {
+              "build:app": "electron-builder --mac dmg --arm64"
+            },
+            "devDependencies": {
+              "electron": "31.2.0",
+              "electron-builder": "24.13.3"
+            },
+            "build": {
+              "appId": "com.archimedekh.lecuredesign",
+              "files": [ "electron/**/*", "public/**/*", "package.json" ],
+              "mac": { "target": ["dmg"], "identity": null, "hardenedRuntime": false, "gatekeeperAssess": false },
+              "dmg": { "artifactName": "LeCureDesign-${version}-mac-arm64.${ext}" }
+            }
+          }
+          JSON
+
+          cat > electron/main.js << 'JS'
+          import { app, BrowserWindow } from 'electron'
+          app.whenReady().then(() => {
+            const win = new BrowserWindow({ width: 900, height: 600 })
+            win.loadFile('public/index.html')
+          })
+          JS
+
+          cat > public/index.html << 'HTML'
+          <!doctype html><html><head>
+            <meta charset="utf-8"/><title>LeCureDesign</title>
+            <style>body{font:16px system-ui;margin:24px}h1{margin:0 0 8px}</style>
+          </head><body>
+            <h1>LeCureDesign Installer</h1>
+            <p>✅ This verifies your macOS DMG build pipeline works.</p>
+            <p>When ready, we’ll swap this “hello” app with the full kitchen planner.</p>
+          </body></html>
+          HTML
+
+      - name: Print versions
+        run: |
+          node -v
+          npm -v
+          npx electron-builder --version
+
       - name: Install deps
-        run: npm ci
-      - name: Build Next.js
-        run: npm run build:web
-      - name: Build DMG
+        run: npm install --no-audit --no-fund
+
+      - name: Build DMG (arm64)
         run: npm run build:app
-        env:
-          NEXT_PUBLIC_REGION: EU-IT
-          NEXT_PUBLIC_CURRENCY: EUR
-      - uses: actions/upload-artifact@v4
-        with: { name: dmg, path: dist/*.dmg }
-      - if: startsWith(github.ref, 'refs/tags/')
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: dist/*.dmg
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        with: { files: dist/*.dmg }
+        with:
+          files: dist/*.dmg

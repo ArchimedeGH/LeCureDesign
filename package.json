@@ -1,0 +1,53 @@
+{
+  "name": "scandi-kitchen-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"next dev -p 3000\" \"wait-on tcp:3000 && electron .\"",
+    "build:web": "next build",
+    "build:app": "electron-builder --mac dmg --universal",
+    "build": "npm run build:web && npm run build:app"
+  },
+  "dependencies": {
+    "next": "15.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "concurrently": "8.2.2",
+    "electron": "31.2.0",
+    "electron-builder": "24.13.3",
+    "get-port": "7.1.0",
+    "wait-on": "7.2.0",
+    "typescript": "5.6.2"
+  },
+  "build": {
+    "appId": "com.archimedekh.lecuredesign",
+    "files": [
+      "electron/**/*",
+      "app/**/*",
+      "public/**/*",
+      "package.json",
+      "next.config.mjs",
+      "tsconfig.json",
+      "!.next/cache/**"
+    ],
+    "extraResources": [
+      { "from": ".next/standalone", "to": "next-standalone" },
+      { "from": ".next/static", "to": "next-static" },
+      { "from": "public", "to": "public" }
+    ],
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.graphics-design",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "ScandiKitchenPlanner-${version}-mac-${arch}.${ext}"
+    }
+  }
+}
