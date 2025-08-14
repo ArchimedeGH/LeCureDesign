@@ -103,7 +103,7 @@ jobs:
           npx electron-builder --version
 
       - name: Install deps
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Build Next (standalone)
         run: npm run build:web
