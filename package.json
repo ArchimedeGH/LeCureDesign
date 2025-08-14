@@ -20,6 +20,8 @@
     "pdf-lib": "^1.17.1",
     "react-konva": "^18.2.9",
     "three": "^0.160.0"
+    "@react-three/drei", "@react-three/fiber", "konva",
+    "pdf-lib", "react-konva", "three"
   },
   "devDependencies": {
     "concurrently": "8.2.2",
