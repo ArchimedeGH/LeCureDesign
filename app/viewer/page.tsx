@@ -1,6 +1,9 @@
 'use client'
 import { Canvas } from '@react-three/fiber'
-import { AccumulativeShadows, RandomizedLight, Environment, OrbitControls } from '@react-three/drei'
+// ⬇️ importa dai sotto-moduli, non da '@react-three/drei' (così eviti Bvh)
+import { AccumulativeShadows, RandomizedLight } from '@react-three/drei/core/AccumulativeShadows'
+import { Environment } from '@react-three/drei/core/Environment'
+import { OrbitControls } from '@react-three/drei/core/OrbitControls'
 import * as THREE from 'three'
 import { useEffect, useMemo, useState } from 'react'
 import { Proposal } from '../lib/types'
