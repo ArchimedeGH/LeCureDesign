@@ -53,7 +53,7 @@ export default function Modeler() {
   }
 
   const gridLines = useMemo(() => {
-    const lines: JSX.Element[] = []
+    const lines: ReactElement[] = []
     const step = 5*pxPerCm
     for (let x=0;x<=size.w;x+=step) lines.push(<Line key={'v'+x} points={[x,0,x,size.h]} stroke="#eee" />)
     for (let y=0;y<=size.h;y+=step) lines.push(<Line key={'h'+y} points={[0,y,size.w,y]} stroke="#eee" />)
