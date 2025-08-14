@@ -65,9 +65,11 @@ jobs:
           name: LeCureDesign-DMG
           path: hello/dist/*.dmg
 
-      # Only create a Release if the DMG file actually exists
-      - name: Create GitHub Release (if DMG exists)
+      - name: Create GitHub Release (auto-tag)
         if: hashFiles('hello/dist/*.dmg') != ''
         uses: softprops/action-gh-release@v2
         with:
           files: hello/dist/*.dmg
+          tag_name: v${{ github.run_number }}
+          name: "LeCureDesign v${{ github.run_number }}"
+          generate_release_notes: true
