@@ -7,6 +7,7 @@ import { OrbitControls } from '@react-three/drei/core/OrbitControls'
 import * as THREE from 'three'
 import { useEffect, useMemo, useState } from 'react'
 import { Proposal } from '../lib/types'
+import type { ReactElement } from 'react'
 
 function CabinetBox({ w, d, h, oak=false, pos:[x,y,z] }:{
   w:number; d:number; h:number; oak?:boolean; pos:[number,number,number]
@@ -18,7 +19,7 @@ function CabinetBox({ w, d, h, oak=false, pos:[x,y,z] }:{
 }
 
 function Scene({ proposal }: { proposal: Proposal }){
-  const boxes: JSX.Element[] = []
+  const boxes: ReactElement[] = []
   for (const c of proposal.cabinets) {
     const h = c.kind==='tall'? 2.1 : 0.75
     const y = h/2
