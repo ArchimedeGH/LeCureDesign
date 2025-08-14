@@ -33,7 +33,7 @@ jobs:
           echo "::endgroup::"
 
       # ⚠️ Questo step riscrive package.json con un JSON valido (a prova di virgole)
-      - name: Rewrite package.json (known-good)
+           - name: Rewrite package.json (known-good)
         run: |
           cat > package.json << 'JSON'
           {
@@ -51,12 +51,12 @@ jobs:
               "next": "15.0.0",
               "react": "18.3.1",
               "react-dom": "18.3.1",
-              "@react-three/drei": "^9.105.0",
-              "@react-three/fiber": "^9.0.0",
-              "konva": "^9.3.11",
-              "pdf-lib": "^1.17.1",
-              "react-konva": "^18.2.9",
-              "three": "^0.160.0"
+              "@react-three/fiber": "8.15.20",
+              "@react-three/drei": "9.105.0",
+              "konva": "9.3.11",
+              "pdf-lib": "1.17.1",
+              "react-konva": "18.2.9",
+              "three": "0.160.0"
             },
             "devDependencies": {
               "concurrently": "8.2.2",
