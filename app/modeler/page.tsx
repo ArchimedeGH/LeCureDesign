@@ -7,6 +7,8 @@ import type { Room, Utility } from '../lib/types'
 const KonvaStage = nextDynamic(() => import('./KonvaStage'), { ssr: false })
 
 function uid() { return Math.random().toString(36).slice(2, 9) }
+
+// Next: forza rendering dinamico per evitare pre-render SSR/SSG della pagina
 export const dynamic = 'force-dynamic'
 
 export default function Modeler() {
