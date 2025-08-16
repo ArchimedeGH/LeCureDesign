@@ -3,9 +3,8 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   async redirects() {
-    return [
-      { source: '/viewer', destination: '/viewer.html', permanent: false }
-    ]
+  return [{ source: '/viewer', destination: '/viewer.html', permanent: false }]
+},
   },
   webpack: (config, { isServer }) => {
     config.resolve = config.resolve || {}
