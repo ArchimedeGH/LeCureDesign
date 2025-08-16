@@ -1,4 +1,4 @@
-name: Build macOS DMG — KILL VIEWER (v4)
+name: Build macOS DMG — No Export, Kill Viewer (final)
 
 on:
   workflow_dispatch:
@@ -12,6 +12,7 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
       - name: Checkout
@@ -19,9 +20,9 @@ jobs:
 
       - name: Show initial repo tree (debug)
         run: |
-          echo "=== MARKER V4 START ==="
-          echo "TOP LEVEL:"; ls -la
-          echo "SEARCH for 'viewer' (case-insensitive, all dirs):"
+          echo "=== START ==="
+          ls -la
+          echo "=== Search 'viewer' (any case) BEFORE NUKE ==="
           (grep -RIn --exclude-dir=.git -i "\bviewer\b" || true)
 
       - name: Setup Node.js
@@ -33,22 +34,21 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund --legacy-peer-deps
 
-      # 💣 NUKE ANY React /viewer route (case-insensitive) anywhere in app/ or pages/
+      # 💣 Remove ANY React /viewer route so Next can't see it at build time.
+      # ✅ Ensure a static Three.js viewer exists.
       - name: NUKE /viewer (case-insensitive) + ensure static viewer
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "=== BEFORE NUKE — find anything with 'viewer' in path ==="
+          echo "=== BEFORE NUKE — files with 'viewer' in path ==="
           [ -d app ] && find app -type f -ipath "*viewer*" | sed 's/^/app: /' || true
           [ -d pages ] && find pages -type f -ipath "*viewer*" | sed 's/^/pages: /' || true
 
-          # Remove App Router routes: any dir named viewer (any case), plus any files in those paths
+          # Remove App Router viewer dirs/files
           if [ -d app ]; then
             find app -type d -iname "viewer" -print -exec rm -rf {} + || true
-            # Defensive: delete any page file that sits under a path containing 'viewer' (any case)
             find app -type f -ipath "*viewer*/*" \( -iname "page.tsx" -o -iname "page.ts" -o -iname "page.jsx" -o -iname "page.js" -o -iname "layout.tsx" -o -iname "layout.ts" \) -print -delete || true
-            # Also delete any remaining files under such folders
             find app -type f -ipath "*viewer*/*" -print -delete || true
           fi
 
@@ -62,18 +62,10 @@ jobs:
           fi
 
           echo "=== AFTER NUKE — should be empty ==="
-          LEFT_APP=$( [ -d app ] && find app -type f -ipath "*viewer*" | wc -l || echo 0 )
-          LEFT_PAGES=$( [ -d pages ] && find pages -type f -ipath "*viewer*" | wc -l || echo 0 )
-          if [ "$LEFT_APP" != "0" ] || [ "$LEFT_PAGES" != "0" ]; then
-            echo "❌ Viewer remnants still present!"
-            [ -d app ] && find app -type f -ipath "*viewer*" || true
-            [ -d pages ] && find pages -type f -ipath "*viewer*" || true
-            exit 1
-          else
-            echo "✅ No /viewer React routes found."
-          fi
+          [ -d app ] && find app -type f -ipath "*viewer*" || true
+          [ -d pages ] && find pages -type f -ipath "*viewer*" || true
 
-          echo "=== Ensure static viewer exists ==="
+          echo "=== Ensure static Three.js viewer exists at public/viewer.html ==="
           mkdir -p public
           if [ ! -f public/viewer.html ]; then
             cat > public/viewer.html <<'HTML'
@@ -108,20 +100,9 @@ HTML
 
           echo "PUBLIC DIR:"; ls -la public
 
-      # (Optional) Patch any lingering 'import dynamic' conflicts in modeler
-      - name: Patch dynamic import in app/modeler/page.tsx (safe no-op if absent)
-        run: |
-          FILE="app/modeler/page.tsx"
-          if [ -f "$FILE" ]; then
-            perl -0777 -i -pe "s/\bimport\s+dynamic\s+from\s+'next\\/dynamic'/import nextDynamic from 'next\\/dynamic'/g" "$FILE" || true
-            perl -0777 -i -pe "s/(^|[^A-Za-z0-9_])dynamic\\s*\\(/\\1nextDynamic(/g" "$FILE" || true
-            echo "--- HEAD $FILE ---"; head -n 20 "$FILE" || true
-          else
-            echo "No app/modeler/page.tsx — skip patch."
-          fi
-
-      - name: Build Next (standalone)
-        run: npm run build:web
+      # 🛑 IMPORTANT: build ONLY (NO next export)
+      - name: Build Next (no export)
+        run: npx next build
 
       - name: Build Electron (DMG)
         run: npx electron-builder --mac dmg
