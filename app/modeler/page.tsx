@@ -1,10 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
-import dynamic from 'next/dynamic'
+import nextDynamic from 'next/dynamic'
 import type { Room, Utility } from '../lib/types'
 
 // ⬇️ Import dinamico del componente che usa react-konva, con SSR disattivato
-const KonvaStage = dynamic(() => import('./KonvaStage'), { ssr: false })
+const KonvaStage = nextDynamic(() => import('./KonvaStage'), { ssr: false })
 
 function uid() { return Math.random().toString(36).slice(2, 9) }
 export const dynamic = 'force-dynamic'
