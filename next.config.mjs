@@ -4,11 +4,12 @@ const nextConfig = {
   reactStrictMode: true,
   async redirects() {
     return [
+      // /viewer now serves the static Three.js page (no SSR)
       { source: '/viewer', destination: '/viewer.html', permanent: false }
     ]
   },
   webpack: (config, { isServer }) => {
-    // Evita che konva cerchi il modulo 'canvas' lato server
+    // Prevent Konva from trying to import the node 'canvas' module on SSR
     config.resolve = config.resolve || {}
     config.resolve.alias = { ...(config.resolve.alias || {}), canvas: false }
     if (isServer) {
