@@ -1,11 +1,10 @@
-'use client'
-import nextDynamic from 'next/dynamic'
-
-// prevent SSR/SSG on this page (R3F must run client-side)
+// SERVER component: holds route config
 export const dynamic = 'force-dynamic'
 
-// load the heavy 3D canvas only on the client
-const ViewerCanvas = nextDynamic(() => import('./ViewerCanvas'), { ssr: false })
+import dynamic from 'next/dynamic'
+
+// Load the client-only R3F canvas on the browser only
+const ViewerCanvas = dynamic(() => import('./ViewerCanvas'), { ssr: false })
 
 export default function ViewerPage() {
   return <ViewerCanvas />
