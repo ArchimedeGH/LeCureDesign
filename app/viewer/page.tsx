@@ -1,14 +1,14 @@
-// SERVER component: route config + explicit dynamic hint
+// SERVER file for /viewer: opt-out of prerender and load client canvas
 export const dynamic = 'force-dynamic'
+export const prerender = false
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
 import dynamic from 'next/dynamic'
-import { headers } from 'next/headers' // ⬅ forces dynamic rendering (no SSG)
 
-// Load the client-only R3F canvas on the browser only
+// Load the client-only R3F canvas in the browser only
 const ViewerCanvas = dynamic(() => import('./ViewerCanvas'), { ssr: false })
 
 export default function ViewerPage() {
-  // This call marks the page as dynamic for the build pipeline
-  headers()
   return <ViewerCanvas />
 }
