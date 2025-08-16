@@ -109,6 +109,17 @@ jobs:
             perl -i -pe "s/\\s*gl\\.physicallyCorrectLights\\s*=\\s*true\\s*;\\s*//" app/viewer/page.tsx || true
           fi
 
+      - name: Patch dynamic import in app/modeler/page.tsx
+        run: |
+          if [ -f app/modeler/page.tsx ]; then
+            # 1) Rename "import dynamic" -> "import nextDynamic"
+            perl -0777 -i -pe "s/\bimport\s+dynamic\s+from\s+'next\\/dynamic'/import nextDynamic from 'next\\/dynamic'/g" app/modeler/page.tsx
+            # 2) Replace calls dynamic(...) -> nextDynamic(...)
+            perl -0777 -i -pe "s/\bdynamic\s*\(/nextDynamic(/g" app/modeler/page.tsx
+            echo "----- TOP OF app/modeler/page.tsx (after patch) -----"
+            head -n 25 app/modeler/page.tsx || true
+          fi
+
       - name: Build Next (standalone)
         run: npm run build:web
 
