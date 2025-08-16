@@ -1,15 +1,17 @@
 'use client'
 import { Canvas } from '@react-three/fiber'
-// ⬇️ importa dai sotto-moduli, non da '@react-three/drei' (così eviti Bvh)
+// importa dai sotto-moduli di drei per evitare Bvh
 import { AccumulativeShadows, RandomizedLight } from '@react-three/drei/core/AccumulativeShadows'
 import { Environment } from '@react-three/drei/core/Environment'
 import { OrbitControls } from '@react-three/drei/core/OrbitControls'
 import * as THREE from 'three'
 import { useEffect, useMemo, useState } from 'react'
-import { Proposal } from '../lib/types'
 import type { ReactElement } from 'react'
+import { Proposal } from '../lib/types'
 
-function CabinetBox({ w, d, h, oak=false, pos:[x,y,z] }:{
+function CabinetBox({
+  w, d, h, oak=false, pos:[x,y,z]
+}:{
   w:number; d:number; h:number; oak?:boolean; pos:[number,number,number]
 }){
   const geom = useMemo(()=> new THREE.BoxGeometry(w/100, h/100, d/100), [w,d,h])
@@ -35,11 +37,13 @@ export default function Viewer(){
   useEffect(()=>{ const arr = JSON.parse(localStorage.getItem('skp_proposals')||'[]') as Proposal[]; if (arr[0]) setProposal(arr[0]) },[])
   return (
     <main style={{ height:'100vh' }}>
-      <Canvas shadows onCreated={({ gl }) => {
-  // three r154+: physicallyCorrectLights è stato rimosso (default già fisico)
-  gl.toneMapping = THREE.ACESFilmicToneMapping
-  gl.outputColorSpace = THREE.SRGBColorSpace
-}}>
+      <Canvas
+        shadows
+        onCreated={({ gl }) => {
+          // three r154+: physicallyCorrectLights rimosso (comportamento fisico di default)
+          gl.toneMapping = THREE.ACESFilmicToneMapping
+          gl.outputColorSpace = THREE.SRGBColorSpace
+        }}>
         <color attach="background" args={["#fafafa"]} />
         <ambientLight intensity={0.2} />
         <AccumulativeShadows frames={60} temporal position={[0,0,0]}>
