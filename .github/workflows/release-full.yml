@@ -1,50 +1,107 @@
-      - name: Enforce root layout as dynamic (no prerender)
+name: Build macOS DMG (Static Viewer, auto-artifact + release)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      # 💥 Kill the React /viewer route so Next can't prerender it.
+      # ✅ Ensure a static Three.js viewer exists at public/viewer.html
+      - name: Remove React /viewer route and ensure static viewer is present
         run: |
-          mkdir -p app
-          cat > app/layout.tsx <<'TSX'
-// SERVER root layout — globally disable prerender/caching
-export const dynamic = 'force-dynamic'
-export const prerender = false
-export const revalidate = 0
-export const fetchCache = 'force-no-store'
+          echo "Before cleanup:"
+          find app -maxdepth 2 -type f 2>/dev/null || true
 
-import type { Metadata } from 'next'
-import './globals.css'
+          rm -rf app/viewer || true
 
-export const metadata: Metadata = {
-  title: 'LeCureDesign — Scandinavian Kitchen Planner',
-  description: 'Modeler • Solver • 3D • PDF',
-}
+          echo "After cleanup:"
+          find app -maxdepth 2 -type f 2>/dev/null || true
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="it">
-      <body style={{ margin: 0, fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial' }}>
-        {children}
-      </body>
-    </html>
-  )
-}
-TSX
-          head -n 25 app/layout.tsx
+          mkdir -p public
+          if [ ! -f public/viewer.html ]; then
+            cat > public/viewer.html <<'HTML'
+<!doctype html><html lang="it"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>LeCureDesign — 3D Viewer</title><style>html,body{margin:0;height:100%}#app{width:100vw;height:100vh;overflow:hidden;background:#fafafa}.hud{position:fixed;top:8px;left:8px;padding:6px 8px;background:#fff;border:1px solid #eee;border-radius:8px;font:14px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#333}</style></head><body><div id="app"></div><div class="hud">Drag=orbit • Wheel=zoom • Shift+Drag=pan</div><script type="module">
+import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js'
+import { OrbitControls } from 'https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js'
+const proposals = JSON.parse(localStorage.getItem('skp_proposals')||'[]'); const proposal = proposals[0]||{cabinets:[]};
+const app = document.getElementById('app');
+const r = new THREE.WebGLRenderer({antialias:true});
+r.setSize(app.clientWidth, app.clientHeight);
+r.setPixelRatio(Math.min(devicePixelRatio,2));
+r.shadowMap.enabled=true; r.shadowMap.type=THREE.PCFSoftShadowMap;
+r.toneMapping=THREE.ACESFilmicToneMapping; r.outputColorSpace=THREE.SRGBColorSpace;
+app.appendChild(r.domElement);
+const scene=new THREE.Scene(); scene.background=new THREE.Color('#fafafa');
+const camera=new THREE.PerspectiveCamera(50, app.clientWidth/app.clientHeight, 0.01, 100); camera.position.set(2.6,1.8,2.6);
+const controls=new OrbitControls(camera, r.domElement); controls.target.set(1.5,0.8,0.3); controls.update();
+scene.add(new THREE.AmbientLight(0xffffff,0.35));
+const dir=new THREE.DirectionalLight(0xffffff,0.9); dir.position.set(3,5,3); dir.castShadow=true; dir.shadow.radius=4; dir.shadow.mapSize.set(2048,2048); scene.add(dir);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(5,5), new THREE.MeshStandardMaterial({color:'#f0f0f0',roughness:0.95})); floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+const grid=new THREE.GridHelper(5,50,0xdddddd,0xeeeeee); grid.position.y=0.001; scene.add(grid);
+const matWhite=new THREE.MeshStandardMaterial({color:'#f5f5f5',roughness:0.8}); const matOak=new THREE.MeshStandardMaterial({color:'#d9c3a1',roughness:0.6,metalness:0.1});
+function addBox(w,d,h,x,y,z,oak=false){const m=new THREE.Mesh(new THREE.BoxGeometry(w/100,h/100,d/100), oak?matOak:matWhite); m.position.set(x/100,y/100,z/100); m.castShadow=m.receiveShadow=true; scene.add(m); return m;}
+const frontZ=30; let totalBaseW=0;
+for(const c of proposal.cabinets||[]){const tall=c.kind==='tall'; const h=tall?210:75; const y=h/2; const x=c.x_cm + c.w_cm/2; addBox(c.w_cm, c.d_cm ?? 63, h, x, y, frontZ, false); if(!tall) totalBaseW+=c.w_cm;}
+if(totalBaseW>0){const topH=4; addBox(totalBaseW,63,topH,totalBaseW/2,75+topH/100,frontZ,true);}
+addEventListener('resize', ()=>{ r.setSize(app.clientWidth,app.clientHeight); camera.aspect=app.clientWidth/app.clientHeight; camera.updateProjectionMatrix(); });
+(function loop(){ r.render(scene,camera); requestAnimationFrame(loop); })();
+</script></body></html>
+HTML
+          fi
 
-      - name: Enforce /viewer server wrapper (no SSR/SSG)
+          echo "public/ content:"; ls -la public
+
+      # (Optional safety) Normalize any lingering 'import dynamic' conflict in modeler page
+      - name: Patch dynamic import in app/modeler/page.tsx (safe no-op if absent)
         run: |
-          mkdir -p app/viewer
-          cat > app/viewer/page.tsx <<'TSX'
-// SERVER file for /viewer — no prerender
-export const dynamic = 'force-dynamic'
-export const prerender = false
-export const revalidate = 0
-export const fetchCache = 'force-no-store'
+          FILE="app/modeler/page.tsx"
+          if [ -f "$FILE" ]; then
+            perl -0777 -i -pe "s/\bimport\s+dynamic\s+from\s+'next\\/dynamic'/import nextDynamic from 'next\\/dynamic'/g" "$FILE" || true
+            perl -0777 -i -pe "s/(^|[^A-Za-z0-9_])dynamic\\s*\\(/\\1nextDynamic(/g" "$FILE" || true
+            head -n 20 "$FILE" || true
+          else
+            echo "No app/modeler/page.tsx — skip patch."
+          fi
 
-import dynamic from 'next/dynamic'
+      - name: Build Next (standalone)
+        run: npm run build:web
 
-// Load the client-only R3F canvas on the browser only
-const ViewerCanvas = dynamic(() => import('./ViewerCanvas'), { ssr: false })
+      - name: Build Electron (DMG)
+        run: npx electron-builder --mac dmg
 
-export default function ViewerPage() {
-  return <ViewerCanvas />
-}
-TSX
-          head -n 25 app/viewer/page.tsx
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeCureDesign-macOS-dmg
+          path: dist/*.dmg
+
+      - name: Create prerelease with DMG
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          name: "LeCureDesign Installer"
+          body: "✅ Pipeline DMG ok. Puoi installare questa app sul Mac."
+          draft: false
+          prerelease: true
+          files: dist/*.dmg
