@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import nextDynamic from 'next/dynamic'
 import type { Room, Utility } from '../lib/types'
 
-// ⬇️ Import dinamico del componente che usa react-konva, con SSR disattivato
+// ⬇️ Load Konva client-only (no SSR)
 const KonvaStage = nextDynamic(() => import('./KonvaStage'), { ssr: false })
 
 function uid() { return Math.random().toString(36).slice(2, 9) }
 
-// Next: forza rendering dinamico per evitare pre-render SSR/SSG della pagina
+// Tell Next this page must be rendered dynamically (no pre-render)
 export const dynamic = 'force-dynamic'
 
 export default function Modeler() {
