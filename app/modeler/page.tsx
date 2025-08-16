@@ -3,12 +3,10 @@ import { useEffect, useState } from 'react'
 import nextDynamic from 'next/dynamic'
 import type { Room, Utility } from '../lib/types'
 
-// ⬇️ Load Konva client-only (no SSR)
+// client-only load of Konva
 const KonvaStage = nextDynamic(() => import('./KonvaStage'), { ssr: false })
 
 function uid() { return Math.random().toString(36).slice(2, 9) }
-
-// Tell Next this page must be rendered dynamically (no pre-render)
 export const dynamic = 'force-dynamic'
 
 export default function Modeler() {
