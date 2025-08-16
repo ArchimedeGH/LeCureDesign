@@ -1,163 +1,50 @@
-name: Build macOS DMG (Full Planner, auto-release)
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-env:
-  CSC_IDENTITY_AUTO_DISCOVERY: "false"
-  ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: "true"
-
-jobs:
-  build:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      # 1) Genera un package.json perfetto (niente config "build" qui dentro)
-      - name: Generate package.json via npm
+      - name: Enforce root layout as dynamic (no prerender)
         run: |
-          rm -f package.json
-          npm init -y
-          npm pkg set name="scandi-kitchen-desktop"
-          npm pkg set version="0.1.0"
-          npm pkg set private=true
-          npm pkg set main="electron/main.js"
-          npm pkg set type="module"
-          npm pkg set scripts.build:web="next build"
-          npm pkg set scripts.build:app="electron-builder --config electron-builder.json --mac dmg --arm64"
-          npm pkg set scripts.build="npm run build:web && npm run build:app"
+          mkdir -p app
+          cat > app/layout.tsx <<'TSX'
+// SERVER root layout — globally disable prerender/caching
+export const dynamic = 'force-dynamic'
+export const prerender = false
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
-          # Dipendenze compatibili (React 18 + R3F 8.x)
-          npm pkg set dependencies.next="15.0.0"
-          npm pkg set dependencies.react="18.3.1"
-          npm pkg set dependencies.react-dom="18.3.1"
-          npm pkg set dependencies.@react-three/fiber="^8.15.0"
-          npm pkg set dependencies.@react-three/drei="^9.105.0"
-          npm pkg set dependencies.konva="^9.3.11"
-          npm pkg set dependencies.pdf-lib="^1.17.1"
-          npm pkg set dependencies.react-konva="^18.2.9"
-          npm pkg set dependencies.three="^0.154.0"
+import type { Metadata } from 'next'
+import './globals.css'
 
-          npm pkg set devDependencies.concurrently="8.2.2"
-          npm pkg set devDependencies.electron="31.2.0"
-          npm pkg set devDependencies.electron-builder="24.13.3"
-          npm pkg set devDependencies.get-port="7.1.0"
-          npm pkg set devDependencies.wait-on="7.2.0"
-          npm pkg set devDependencies.typescript="5.6.2"
-          npm pkg set devDependencies.@types/react="^18.3.0"
-          npm pkg set devDependencies.@types/react-dom="^18.3.0"
+export const metadata: Metadata = {
+  title: 'LeCureDesign — Scandinavian Kitchen Planner',
+  description: 'Modeler • Solver • 3D • PDF',
+}
 
-          echo "----- package.json -----"
-          cat package.json
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="it">
+      <body style={{ margin: 0, fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial' }}>
+        {children}
+      </body>
+    </html>
+  )
+}
+TSX
+          head -n 25 app/layout.tsx
 
-      # 2) Configurazione electron-builder in file separato (niente più EJSONPARSE)
-      - name: Write electron-builder.json
+      - name: Enforce /viewer server wrapper (no SSR/SSG)
         run: |
-          cat > electron-builder.json <<'JSON'
-          {
-            "appId": "com.archimedekh.lecuredesign",
-            "files": [
-              "electron/**/*",
-              "app/**/*",
-              "public/**/*",
-              "package.json",
-              "next.config.mjs",
-              "tsconfig.json",
-              "!.next/cache/**"
-            ],
-            "extraResources": [
-              { "from": ".next/standalone", "to": "next-standalone" },
-              { "from": ".next/static", "to": "next-static" },
-              { "from": "public", "to": "public" }
-            ],
-            "mac": {
-              "target": ["dmg"],
-              "category": "public.app-category.graphics-design",
-              "hardenedRuntime": false,
-              "gatekeeperAssess": false,
-              "identity": null
-            },
-            "dmg": {
-              "artifactName": "LeCureDesign-${version}-mac-arm64.${ext}"
-            }
-          }
-          JSON
-          echo "----- electron-builder.json -----"
-          cat electron-builder.json
+          mkdir -p app/viewer
+          cat > app/viewer/page.tsx <<'TSX'
+// SERVER file for /viewer — no prerender
+export const dynamic = 'force-dynamic'
+export const prerender = false
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
-      - name: Print versions
-        run: |
-          node -v
-          npm -v
-          npx electron-builder --version
+import dynamic from 'next/dynamic'
 
-      - name: Install deps
-        run: npm install --no-audit --no-fund --legacy-peer-deps
+// Load the client-only R3F canvas on the browser only
+const ViewerCanvas = dynamic(() => import('./ViewerCanvas'), { ssr: false })
 
-      - name: Ensure no obsolete three props remain
-        run: | 
-          if [ -f app/viewer/page.tsx ]; then
-            perl -i -pe "s/\\s*gl\\.physicallyCorrectLights\\s*=\\s*true\\s*;\\s*//" app/viewer/page.tsx || true
-          fi
-
-      - name: Patch dynamic import in app/modeler/page.tsx
-        run: |
-          if [ -f app/modeler/page.tsx ]; then
-            # 1) Rename "import dynamic" -> "import nextDynamic"
-            perl -0777 -i -pe "s/\bimport\s+dynamic\s+from\s+'next\\/dynamic'/import nextDynamic from 'next\\/dynamic'/g" app/modeler/page.tsx
-            # 2) Replace calls dynamic(...) -> nextDynamic(...)
-            perl -0777 -i -pe "s/\bdynamic\s*\(/nextDynamic(/g" app/modeler/page.tsx
-            echo "----- TOP OF app/modeler/page.tsx (after patch) -----"
-            head -n 25 app/modeler/page.tsx || true
-          fi
-
-      - name: Patch dynamic import in app/modeler/page.tsx
-        run: |
-          if [ -f app/modeler/page.tsx ]; then
-            perl -0777 -i -pe "s/\bimport\s+dynamic\s+from\s+'next\\/dynamic'/import nextDynamic from 'next\\/dynamic'/g" app/modeler/page.tsx
-            perl -0777 -i -pe "s/\bdynamic\s*\\(/nextDynamic(/g" app/modeler/page.tsx
-            head -n 20 app/modeler/page.tsx
-          fi
-
-      - name: Build Next (standalone)
-        run: npm run build:web
-
-      - name: Build Electron DMG (arm64)
-        run: npm run build:app
-        env:
-          DEBUG: electron-builder
-
-      - name: List dist
-        run: ls -la dist || true
-
-      - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: LeCureDesign-Full
-          path: dist/*.dmg
-
-      - name: Create & push tag
-        run: |
-          TAG="v${GITHUB_RUN_NUMBER}"
-          echo "TAG=$TAG" >> $GITHUB_ENV
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Auto tag $TAG" || true
-          git push origin "$TAG" || true
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG }}
-          name: "LeCureDesign ${{ env.TAG }}"
-          files: dist/*.dmg
-          generate_release_notes: true
+export default function ViewerPage() {
+  return <ViewerCanvas />
+}
+TSX
+          head -n 25 app/viewer/page.tsx
