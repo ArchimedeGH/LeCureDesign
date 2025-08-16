@@ -1,4 +1,4 @@
-// SERVER component: holds route config
+// SERVER component: holds route config for this segment
 export const dynamic = 'force-dynamic'
 
 import dynamic from 'next/dynamic'
