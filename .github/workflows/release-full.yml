@@ -1,4 +1,4 @@
-name: Build macOS DMG (Static Viewer, auto-artifact + release)
+name: Build macOS DMG (Static Viewer, hard-delete /viewer, auto-artifact + release)
 
 on:
   workflow_dispatch:
@@ -19,10 +19,10 @@ jobs:
 
       - name: Show initial repo tree (debug)
         run: |
-          echo "=== REPO TREE (top-level) ==="
+          echo "=== TOP-LEVEL ==="
           ls -la
-          echo "=== APP DIR (if present) ==="
-          [ -d app ] && find app -maxdepth 3 -type f || true
+          echo "=== SEARCH for 'viewer' references BEFORE NUKE ==="
+          (grep -RIn --exclude-dir=.git viewer || true)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,32 +33,47 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund --legacy-peer-deps
 
-      # 💥 NUKE ANY React /viewer route anywhere so Next can't prerender it
-      - name: Remove ANY /viewer route from App/Pages Router and ensure static viewer exists
+      # 💥 Remove ANY React /viewer route so Next can't prerender it.
+      # We search and delete aggressively and then HARD-FAIL if anything remains.
+      - name: NUKE any /viewer route from App/Pages Router and GUARANTEE static viewer
         shell: bash
         run: |
-          echo "=== BEFORE NUKE ==="
-          find app -type f -path "*viewer*" 2>/dev/null || true
-          find pages -type f -name "viewer.*" 2>/dev/null || true
+          set -e
 
-          # Remove App Router viewer routes (any depth)
+          echo "=== BEFORE NUKE (files under app/ and pages/) ==="
+          [ -d app ] && find app -maxdepth 4 -type f | sed 's/^/app: /' || true
+          [ -d pages ] && find pages -maxdepth 4 -type f | sed 's/^/pages: /' || true
+
+          echo "=== Remove App Router viewer dirs/files ==="
           if [ -d app ]; then
-            # delete any directory named 'viewer' under app (and its contents)
-            find app -type d -name "viewer" -prune -exec rm -rf {} + || true
-            # defensive: delete any file named page.(ts|tsx|js|jsx) that lives inside a path containing 'viewer'
+            # Delete any directory named 'viewer' anywhere under app/
+            find app -type d -name "viewer" -exec rm -rf {} + || true
+            # Defensive: delete any page.* living in a path that contains 'viewer'
             find app -type f -path "*viewer*/*" \( -name "page.tsx" -o -name "page.ts" -o -name "page.jsx" -o -name "page.js" \) -delete || true
+            # Also delete stray component files that might be imported by page
+            find app -type f -path "*viewer*/*" -delete || true
           fi
 
-          # Remove Pages Router route if present
+          echo "=== Remove Pages Router viewer files ==="
           if [ -d pages ]; then
             rm -f pages/viewer.tsx pages/viewer.ts pages/viewer.jsx pages/viewer.js || true
+            # Also remove any nested /viewer under /pages
+            find pages -type d -name "viewer" -exec rm -rf {} + || true
           fi
 
-          echo "=== AFTER NUKE (should be empty) ==="
-          find app -type f -path "*viewer*" 2>/dev/null || true
-          find pages -type f -name "viewer.*" 2>/dev/null || true
+          echo "=== AFTER NUKE, scan again (should be EMPTY) ==="
+          LEFT_APP=$( [ -d app ] && find app -type f -path "*viewer*" | wc -l || echo 0 )
+          LEFT_PAGES=$( [ -d pages ] && find pages -type f -path "*viewer*" | wc -l || echo 0 )
+          if [ "$LEFT_APP" != "0" ] || [ "$LEFT_PAGES" != "0" ]; then
+            echo "❌ Viewer route remnants still present!"
+            [ -d app ] && find app -type f -path "*viewer*" || true
+            [ -d pages ] && find pages -type f -path "*viewer*" || true
+            exit 1
+          else
+            echo "✅ No /viewer React routes found."
+          fi
 
-          # Ensure static Three.js viewer exists
+          echo "=== Ensure static Three.js viewer exists at public/viewer.html ==="
           mkdir -p public
           if [ ! -f public/viewer.html ]; then
             cat > public/viewer.html <<'HTML'
@@ -94,7 +109,7 @@ HTML
           echo "=== PUBLIC DIR ==="
           ls -la public
 
-      # (Optional) Patch any lingering 'import dynamic' conflicts in modeler
+      # (Optional) Patch any lingering 'import dynamic' conflicts in modeler (safe no-op)
       - name: Patch dynamic import in app/modeler/page.tsx (safe no-op if absent)
         run: |
           FILE="app/modeler/page.tsx"
