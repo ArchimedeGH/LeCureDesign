@@ -1,12 +1,10 @@
 'use client'
 import { Canvas } from '@react-three/fiber'
-// importa dai sotto-moduli di drei per evitare Bvh
 import { AccumulativeShadows, RandomizedLight } from '@react-three/drei/core/AccumulativeShadows'
 import { Environment } from '@react-three/drei/core/Environment'
 import { OrbitControls } from '@react-three/drei/core/OrbitControls'
 import * as THREE from 'three'
-import { useEffect, useMemo, useState } from 'react'
-import type { ReactElement } from 'react'
+import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import { Proposal } from '../lib/types'
 
 function CabinetBox({
@@ -40,7 +38,7 @@ export default function Viewer(){
       <Canvas
         shadows
         onCreated={({ gl }) => {
-          // three r154+: physicallyCorrectLights rimosso (comportamento fisico di default)
+          // three r154+: physicallyCorrectLights removed; defaults are fine
           gl.toneMapping = THREE.ACESFilmicToneMapping
           gl.outputColorSpace = THREE.SRGBColorSpace
         }}>
