@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 20
 
-      # ✅ Genera un package.json PERFETTO (niente JSON incollato a mano)
+      # 1) Genera un package.json perfetto (niente config "build" qui dentro)
       - name: Generate package.json via npm
         run: |
           rm -f package.json
@@ -33,10 +33,10 @@ jobs:
           npm pkg set main="electron/main.js"
           npm pkg set type="module"
           npm pkg set scripts.build:web="next build"
-          npm pkg set scripts.build:app="electron-builder --mac dmg --arm64"
+          npm pkg set scripts.build:app="electron-builder --config electron-builder.json --mac dmg --arm64"
           npm pkg set scripts.build="npm run build:web && npm run build:app"
 
-          # Dipendenze compatibili: React 18 + R3F 8.x
+          # Dipendenze compatibili (React 18 + R3F 8.x)
           npm pkg set dependencies.next="15.0.0"
           npm pkg set dependencies.react="18.3.1"
           npm pkg set dependencies.react-dom="18.3.1"
@@ -56,29 +56,43 @@ jobs:
           npm pkg set devDependencies.@types/react="^18.3.0"
           npm pkg set devDependencies.@types/react-dom="^18.3.0"
 
-          # Config electron-builder (niente JSON manuale: set con chiavi)
-          npm pkg set build.appId="com.archimedekh.lecuredesign"
-          npm pkg set build.files[0]="electron/**/*"
-          npm pkg set build.files[1]="app/**/*"
-          npm pkg set build.files[2]="public/**/*"
-          npm pkg set build.files[3]="package.json"
-          npm pkg set build.files[4]="next.config.mjs"
-          npm pkg set build.files[5]="tsconfig.json"
-          npm pkg set build.files[6]="!.next/cache/**"
-          npm pkg set build.extraResources[0].from=".next/standalone"
-          npm pkg set build.extraResources[0].to="next-standalone"
-          npm pkg set build.extraResources[1].from=".next/static"
-          npm pkg set build.extraResources[1].to="next-static"
-          npm pkg set build.extraResources[2].from="public"
-          npm pkg set build.extraResources[2].to="public"
-          npm pkg set build.mac.target[0]="dmg"
-          npm pkg set build.mac.category="public.app-category.graphics-design"
-          npm pkg set build.mac.hardenedRuntime=false
-          npm pkg set build.mac.gatekeeperAssess=false
-          npm pkg set build.dmg.artifactName="LeCureDesign-\${version}-mac-arm64.\${ext}"
-
           echo "----- package.json -----"
           cat package.json
+
+      # 2) Configurazione electron-builder in file separato (niente più EJSONPARSE)
+      - name: Write electron-builder.json
+        run: |
+          cat > electron-builder.json <<'JSON'
+          {
+            "appId": "com.archimedekh.lecuredesign",
+            "files": [
+              "electron/**/*",
+              "app/**/*",
+              "public/**/*",
+              "package.json",
+              "next.config.mjs",
+              "tsconfig.json",
+              "!.next/cache/**"
+            ],
+            "extraResources": [
+              { "from": ".next/standalone", "to": "next-standalone" },
+              { "from": ".next/static", "to": "next-static" },
+              { "from": "public", "to": "public" }
+            ],
+            "mac": {
+              "target": ["dmg"],
+              "category": "public.app-category.graphics-design",
+              "hardenedRuntime": false,
+              "gatekeeperAssess": false,
+              "identity": null
+            },
+            "dmg": {
+              "artifactName": "LeCureDesign-${version}-mac-arm64.${ext}"
+            }
+          }
+          JSON
+          echo "----- electron-builder.json -----"
+          cat electron-builder.json
 
       - name: Print versions
         run: |
@@ -93,7 +107,7 @@ jobs:
         run: npm run build:web
 
       - name: Build Electron DMG (arm64)
-        run: npx electron-builder --mac dmg --arm64
+        run: npm run build:app
         env:
           DEBUG: electron-builder
 
