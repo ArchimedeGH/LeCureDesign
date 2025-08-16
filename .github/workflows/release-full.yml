@@ -103,6 +103,12 @@ jobs:
       - name: Install deps
         run: npm install --no-audit --no-fund --legacy-peer-deps
 
+      - name: Ensure no obsolete three props remain
+        run: | 
+          if [ -f app/viewer/page.tsx ]; then
+            perl -i -pe "s/\\s*gl\\.physicallyCorrectLights\\s*=\\s*true\\s*;\\s*//" app/viewer/page.tsx || true
+          fi
+
       - name: Build Next (standalone)
         run: npm run build:web
 
