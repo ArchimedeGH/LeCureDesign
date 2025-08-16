@@ -35,11 +35,11 @@ export default function Viewer(){
   useEffect(()=>{ const arr = JSON.parse(localStorage.getItem('skp_proposals')||'[]') as Proposal[]; if (arr[0]) setProposal(arr[0]) },[])
   return (
     <main style={{ height:'100vh' }}>
-      <Canvas shadows onCreated={({ gl })=>{
-        gl.physicallyCorrectLights = true
-        gl.toneMapping = THREE.ACESFilmicToneMapping
-        gl.outputColorSpace = THREE.SRGBColorSpace
-      }}>
+      <Canvas shadows onCreated={({ gl }) => {
+  // three r154+: physicallyCorrectLights è stato rimosso (default già fisico)
+  gl.toneMapping = THREE.ACESFilmicToneMapping
+  gl.outputColorSpace = THREE.SRGBColorSpace
+}}>
         <color attach="background" args={["#fafafa"]} />
         <ambientLight intensity={0.2} />
         <AccumulativeShadows frames={60} temporal position={[0,0,0]}>
