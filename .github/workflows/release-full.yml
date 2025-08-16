@@ -17,6 +17,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Show initial repo tree (debug)
+        run: |
+          echo "=== REPO TREE (top-level) ==="
+          ls -la
+          echo "=== APP DIR (if present) ==="
+          [ -d app ] && find app -maxdepth 3 -type f || true
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -26,18 +33,32 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund --legacy-peer-deps
 
-      # 💥 Kill the React /viewer route so Next can't prerender it.
-      # ✅ Ensure a static Three.js viewer exists at public/viewer.html
-      - name: Remove React /viewer route and ensure static viewer is present
+      # 💥 NUKE ANY React /viewer route anywhere so Next can't prerender it
+      - name: Remove ANY /viewer route from App/Pages Router and ensure static viewer exists
+        shell: bash
         run: |
-          echo "Before cleanup:"
-          find app -maxdepth 2 -type f 2>/dev/null || true
+          echo "=== BEFORE NUKE ==="
+          find app -type f -path "*viewer*" 2>/dev/null || true
+          find pages -type f -name "viewer.*" 2>/dev/null || true
 
-          rm -rf app/viewer || true
+          # Remove App Router viewer routes (any depth)
+          if [ -d app ]; then
+            # delete any directory named 'viewer' under app (and its contents)
+            find app -type d -name "viewer" -prune -exec rm -rf {} + || true
+            # defensive: delete any file named page.(ts|tsx|js|jsx) that lives inside a path containing 'viewer'
+            find app -type f -path "*viewer*/*" \( -name "page.tsx" -o -name "page.ts" -o -name "page.jsx" -o -name "page.js" \) -delete || true
+          fi
 
-          echo "After cleanup:"
-          find app -maxdepth 2 -type f 2>/dev/null || true
+          # Remove Pages Router route if present
+          if [ -d pages ]; then
+            rm -f pages/viewer.tsx pages/viewer.ts pages/viewer.jsx pages/viewer.js || true
+          fi
 
+          echo "=== AFTER NUKE (should be empty) ==="
+          find app -type f -path "*viewer*" 2>/dev/null || true
+          find pages -type f -name "viewer.*" 2>/dev/null || true
+
+          # Ensure static Three.js viewer exists
           mkdir -p public
           if [ ! -f public/viewer.html ]; then
             cat > public/viewer.html <<'HTML'
@@ -70,16 +91,17 @@ addEventListener('resize', ()=>{ r.setSize(app.clientWidth,app.clientHeight); ca
 HTML
           fi
 
-          echo "public/ content:"; ls -la public
+          echo "=== PUBLIC DIR ==="
+          ls -la public
 
-      # (Optional safety) Normalize any lingering 'import dynamic' conflict in modeler page
+      # (Optional) Patch any lingering 'import dynamic' conflicts in modeler
       - name: Patch dynamic import in app/modeler/page.tsx (safe no-op if absent)
         run: |
           FILE="app/modeler/page.tsx"
           if [ -f "$FILE" ]; then
             perl -0777 -i -pe "s/\bimport\s+dynamic\s+from\s+'next\\/dynamic'/import nextDynamic from 'next\\/dynamic'/g" "$FILE" || true
             perl -0777 -i -pe "s/(^|[^A-Za-z0-9_])dynamic\\s*\\(/\\1nextDynamic(/g" "$FILE" || true
-            head -n 20 "$FILE" || true
+            echo "--- HEAD $FILE ---"; head -n 20 "$FILE" || true
           else
             echo "No app/modeler/page.tsx — skip patch."
           fi
