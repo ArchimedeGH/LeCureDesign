@@ -35,11 +35,12 @@ export default function KonvaStage({
         const pos = e.target.getStage()?.getPointerPosition(); if (!pos) return
         const x_cm = Math.round(pos.x / pxPerCm)
         if (pos.y < 20) {
-          // inserisci lungo la parete superiore
           if (e.evt.shiftKey) {
             onAddOpening('door', x_cm - 40, 80)
           } else if (e.evt.altKey) {
             onAddOpening('window', x_cm - 60, 120)
+          } else {
+            onAddUtility('water', x_cm) // default utility if no modifier
           }
         }
       }}
