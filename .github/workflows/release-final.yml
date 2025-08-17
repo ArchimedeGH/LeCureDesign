@@ -1,13 +1,10 @@
 name: Build macOS DMG — final
-
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-
 permissions:
   contents: write
-
 jobs:
   build-macos:
     runs-on: macos-latest
@@ -15,70 +12,33 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: "true"
       NEXT_TELEMETRY_DISABLED: "1"
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Show initial repo tree (debug)
-        run: |
-          echo "=== TOP ==="; ls -la
-          echo "=== SEARCH 'viewer' BEFORE ==="
-          (grep -RIn --exclude-dir=.git -i "\bviewer\b" || true)
-          echo "=== LIST app/ ==="
-          [ -d app ] && find app -maxdepth 3 -type f || true
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-
-      - name: Install deps
-        run: npm install --no-audit --no-fund --legacy-peer-deps
-
-      - name: Nuke ANY /viewer route + ensure static viewer.html
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Nuke /viewer + ensure static viewer.html
         shell: bash
         run: |
           set -euo pipefail
-          echo "BEFORE NUKE:"
-          [ -d app ] && find app -type f -ipath "*viewer*" || true
-          [ -d pages ] && find pages -type f -ipath "*viewer*" || true
-
-          if [ -d app ]; then
-            find app -type d -iname "viewer" -print -exec rm -rf {} + || true
-            find app -type f -ipath "*viewer*/*" -print -delete || true
-          fi
-          if [ -d pages ]; then
-            find pages -type d -iname "viewer" -print -exec rm -rf {} + || true
-            find pages -type f -iname "viewer.*" -print -delete || true
-          fi
-
-          echo "AFTER NUKE:"
-          [ -d app ] && find app -type f -ipath "*viewer*" || true
-          [ -d pages ] && find pages -type f -ipath "*viewer*" || true
-
+          [ -d app ] && find app -type d -iname "viewer" -print -exec rm -rf {} + || true
+          [ -d app ] && find app -type f -ipath "*viewer*/*" -print -delete || true
+          [ -d pages ] && find pages -type d -iname "viewer" -print -exec rm -rf {} + || true
+          [ -d pages ] && find pages -type f -iname "viewer.*" -print -delete || true
           mkdir -p public
-          if [ ! -f public/viewer.html ]; then
-            echo "Creating public/viewer.html"
-            cat > public/viewer.html <<'HTML'
+          [ -f public/viewer.html ] || cat > public/viewer.html <<'HTML'
 <!doctype html><title>Viewer</title><div id="app"></div><script type="module">
 import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js';
 const app=document.getElementById('app');const r=new THREE.WebGLRenderer({antialias:true});r.setSize(innerWidth,innerHeight);app.appendChild(r.domElement);
 const s=new THREE.Scene();const c=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.01,100);c.position.set(2.6,1.8,2.6);
 const g=new THREE.GridHelper(5,50);s.add(g);(function loop(){r.render(s,c);requestAnimationFrame(loop)})();</script>
 HTML
-          fi
-          echo "PUBLIC:"; ls -la public
-
-      - name: Build Next
-        run: npx next build
-
-      - name: Build Electron (DMG)
-        run: npx electron-builder --mac dmg
-
-      - name: Upload DMG
-        uses: actions/upload-artifact@v4
+          ls -la public || true
+      - run: npx next build
+      - run: npx electron-builder --mac dmg
+      - uses: actions/upload-artifact@v4
         with:
           name: LeCureDesign-macOS-dmg
           path: dist/*.dmg
