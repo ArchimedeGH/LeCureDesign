@@ -42,3 +42,4 @@ HTML
         with:
           name: LeCureDesign-macOS-dmg
           path: dist/*.dmg
+          
