@@ -7,7 +7,7 @@
   <style>
     html, body { margin:0; height:100%; }
     #app { width:100vw; height:100vh; overflow:hidden; background:#fafafa; }
-    .hud { position:fixed; top:8px; left:8px; padding:6px 8px; background:#fff; border:1px solid #eee; border-radius:8px; font:14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#333; }
+    .hud { position:fixed; top:8px; left:8px; padding:6px 8px; background:#fff; border:1px solid #eee; border-radius:8px; font:14px system-ui,-apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#333; }
   </style>
 </head>
 <body>
@@ -18,11 +18,9 @@
     import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js'
     import { OrbitControls } from 'https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js'
 
-    // ---- Carica la proposta salvata dal Modeler (LocalStorage)
     const proposals = JSON.parse(localStorage.getItem('skp_proposals') || '[]')
     const proposal = proposals[0] || { cabinets: [] }
 
-    // ---- Renderer (PBR sensato)
     const app = document.getElementById('app')
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(app.clientWidth, app.clientHeight)
@@ -30,11 +28,9 @@
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.0
     renderer.outputColorSpace = THREE.SRGBColorSpace
     app.appendChild(renderer.domElement)
 
-    // ---- Scene & camera
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#fafafa')
 
@@ -45,7 +41,6 @@
     controls.target.set(1.5, 0.8, 0.3)
     controls.update()
 
-    // ---- Luci
     scene.add(new THREE.AmbientLight(0xffffff, 0.35))
     const dir = new THREE.DirectionalLight(0xffffff, 0.9)
     dir.position.set(3, 5, 3)
@@ -54,27 +49,21 @@
     dir.shadow.mapSize.set(2048,2048)
     scene.add(dir)
 
-    // ---- Pavimento
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(5, 5),
-      new THREE.MeshStandardMaterial({ color:'#f0f0f0', roughness:0.95, metalness:0 })
+      new THREE.MeshStandardMaterial({ color:'#f0f0f0', roughness:0.95 })
     )
     floor.rotation.x = -Math.PI/2
     floor.receiveShadow = true
     scene.add(floor)
 
-    // ---- Griglia
     const grid = new THREE.GridHelper(5, 50, 0xdddddd, 0xeeeeee)
     grid.position.y = 0.001
     scene.add(grid)
 
-    // ---- Materiali
-    const matWhite = new THREE.MeshStandardMaterial({ color:'#f5f5f5', roughness:0.8, metalness:0 })
+    const matWhite = new THREE.MeshStandardMaterial({ color:'#f5f5f5', roughness:0.8 })
     const matOak   = new THREE.MeshStandardMaterial({ color:'#d9c3a1', roughness:0.6, metalness:0.1 })
-    matWhite.envMapIntensity = 1.0
-    matOak.envMapIntensity = 1.0
 
-    // Helper per aggiungere box in cm
     function addBox(w_cm, d_cm, h_cm, x_cm, y_cm, z_cm, oak=false) {
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(w_cm/100, h_cm/100, d_cm/100),
@@ -86,8 +75,7 @@
       return mesh
     }
 
-    // ---- Crea mobili (cm → metri)
-    const frontZ = 30 // cm davanti
+    const frontZ = 30 // cm
     let totalBaseW = 0
 
     for (const c of proposal.cabinets || []) {
@@ -99,25 +87,18 @@
       if (!isTall) totalBaseW += c.w_cm
     }
 
-    // ---- Top in rovere
     if (totalBaseW > 0) {
       const topH = 4 // cm
       addBox(totalBaseW, 63, topH, totalBaseW/2, 75 + topH/100, frontZ, true)
     }
 
-    // ---- Resize
-    const onResize = () => {
+    addEventListener('resize', () => {
       renderer.setSize(app.clientWidth, app.clientHeight)
       camera.aspect = app.clientWidth/app.clientHeight
       camera.updateProjectionMatrix()
-    }
-    addEventListener('resize', onResize)
+    })
 
-    // ---- Loop
-    const tick = () => {
-      renderer.render(scene, camera)
-      requestAnimationFrame(tick)
-    }
+    const tick = () => { renderer.render(scene, camera); requestAnimationFrame(tick) }
     tick()
   </script>
 </body>
