@@ -32,3 +32,4 @@ App desktop (Electron + Next.js) per progettare cucine in stile scandinavo con:
 **Installazione**
 ```bash
 npm install --no-audit --no-fund --legacy-peer-deps
+
