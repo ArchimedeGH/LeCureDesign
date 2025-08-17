@@ -1,0 +1,7 @@
+name: Check Actions works
+on: { workflow_dispatch: {}, push: { branches: [ main ] } }
+jobs:
+  ok:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Actions attive ✅"
