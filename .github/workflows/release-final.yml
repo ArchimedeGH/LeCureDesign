@@ -1,7 +1,7 @@
 name: Build macOS DMG — final
 
 on:
-  workflow_dispatch: {}   # <— abilita il bottone "Run workflow"
+  workflow_dispatch: {}
   push:
     branches: [ main ]
 
@@ -17,13 +17,32 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Usa la cache SOLO se esiste un lock file
+      - name: Setup Node (with cache)
+        if: ${{ hashFiles('**/package-lock.json', '**/npm-shrinkwrap.json', '**/yarn.lock') != '' }}
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      - run: npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Setup Node (no cache)
+        if: ${{ hashFiles('**/package-lock.json', '**/npm-shrinkwrap.json', '**/yarn.lock') == '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            echo "Lock file presente → uso npm ci"
+            npm ci --no-audit --no-fund
+          else
+            echo "Nessun lock file → uso npm install (legacy peer deps)"
+            npm install --no-audit --no-fund --legacy-peer-deps
+          fi
 
       - name: Nuke /viewer + ensure static viewer.html
         shell: bash
@@ -43,10 +62,14 @@ const g=new THREE.GridHelper(5,50);s.add(g);(function loop(){r.render(s,c);reque
 HTML
           ls -la public || true
 
-      - run: npx next build
-      - run: npx electron-builder --mac dmg
+      - name: Build Next (no export)
+        run: npx next build
 
-      - uses: actions/upload-artifact@v4
+      - name: Build Electron (DMG)
+        run: npx electron-builder --mac dmg
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
         with:
           name: LeCureDesign-macOS-dmg
           path: dist/*.dmg
