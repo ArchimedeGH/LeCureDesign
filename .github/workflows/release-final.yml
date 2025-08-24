@@ -20,27 +20,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Usa la cache SOLO se esiste un lock file
-      - name: Setup Node (with cache)
-        if: ${{ hashFiles('**/package-lock.json', '**/npm-shrinkwrap.json', '**/yarn.lock') != '' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
+      # <<< NIENTE cache qui >>>
       - name: Setup Node (no cache)
-        if: ${{ hashFiles('**/package-lock.json', '**/npm-shrinkwrap.json', '**/yarn.lock') == '' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Show Node & lock files
+        run: |
+          node -v && npm -v
+          echo "Lock files presenti:"
+          ls -1 package-lock.json yarn.lock npm-shrinkwrap.json 2>/dev/null || true
 
       - name: Install deps
         run: |
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            echo "Lock file presente → uso npm ci"
+            echo "Lock file presente → npm ci"
             npm ci --no-audit --no-fund
           else
-            echo "Nessun lock file → uso npm install (legacy peer deps)"
+            echo "Nessun lock file → npm install (legacy peer deps)"
             npm install --no-audit --no-fund --legacy-peer-deps
           fi
 
